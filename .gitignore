@@ -1,3 +1,8 @@
 bin/
 obj/
 BenchmarkDotNet.Artifacts/
+.vs/
+
+*.user
+*.suo
+*.cache
