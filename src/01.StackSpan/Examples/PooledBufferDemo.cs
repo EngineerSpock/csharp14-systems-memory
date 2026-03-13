@@ -13,6 +13,22 @@ internal static class PooledBufferDemo
         SendTelemetryBatch(sequence: 17, eventCount: 3);
     }
 
+    public static async Task RunAsync()
+    {
+        Console.WriteLine("ref struct cannot cross await, so serialize after the async read:");
+        await SendTelemetryAsync();
+    }
+
+    // This would not compile because PooledBuffer<T> is a ref struct and an async
+    // method may lift locals into a heap-allocated state machine:
+    //
+    // async Task SendAsync()
+    // {
+    //     using var buffer = new PooledBuffer<byte>(1024);
+    //     await Task.Delay(1);
+    //     Send(buffer.Span);
+    // }
+
     private static void SendTelemetryBatch(int sequence, int eventCount)
     {
         using var buffer = new PooledBuffer<byte>(BatchBufferSize);
@@ -43,7 +59,42 @@ internal static class PooledBufferDemo
         Console.WriteLine($"sequence={sequence}, bytes={batch.Length}");
         Console.WriteLine(Convert.ToHexString(batch));
     }
+
+    private static async Task SendTelemetryAsync()
+    {
+        var telemetryEvent = await ReadTelemetryEventAsync();
+        SerializeAndSend();
+
+        void SerializeAndSend()
+        {
+            using var buffer = new PooledBuffer<byte>(1024);
+            var span = buffer.Span;
+
+            var written = SerializeTelemetry(telemetryEvent, span);
+            Send(span.Slice(0, written));
+        }
+    }
+
+    private static async Task<TelemetryEvent> ReadTelemetryEventAsync()
+    {
+        await Task.Delay(1);
+        return new TelemetryEvent(101, 4096);
+    }
+
+    private static int SerializeTelemetry(TelemetryEvent telemetryEvent, Span<byte> destination)
+    {
+        BitConverter.TryWriteBytes(destination[..4], telemetryEvent.MetricId);
+        BitConverter.TryWriteBytes(destination[4..8], telemetryEvent.Value);
+        return 8;
+    }
+
+    private static void Send(ReadOnlySpan<byte> payload)
+    {
+        Console.WriteLine(Convert.ToHexString(payload));
+    }
 }
+
+internal readonly record struct TelemetryEvent(int MetricId, int Value);
 
 internal ref struct PooledBuffer<T>
 {

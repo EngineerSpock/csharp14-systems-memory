@@ -7,3 +7,6 @@ TelemetryPacketDemo.Run();
 Console.WriteLine();
 
 PooledBufferDemo.Run();
+Console.WriteLine();
+
+await PooledBufferDemo.RunAsync();
