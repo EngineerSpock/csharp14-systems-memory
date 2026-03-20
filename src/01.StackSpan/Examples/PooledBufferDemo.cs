@@ -60,6 +60,17 @@ internal static class PooledBufferDemo
         Console.WriteLine(Convert.ToHexString(batch));
     }
 
+    // error CS4007: Instance of type 'System.Span<byte>' cannot be preserved across 'await' or 'yield' boundary.
+    // private static async Task SendTelemetryBrokenAsync()
+    // {
+    //     using var buffer = new PooledBuffer<byte>(1024);
+    //     var span = buffer.Span;
+
+    //     var telemetryEvent = await ReadTelemetryEventAsync();
+    //     var written = SerializeTelemetry(telemetryEvent, span);
+
+    //     Send(span.Slice(0, written));
+    // }
     private static async Task SendTelemetryAsync()
     {
         var telemetryEvent = await ReadTelemetryEventAsync();
