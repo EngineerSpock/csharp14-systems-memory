@@ -9,4 +9,4 @@ Console.WriteLine();
 PooledBufferDemo.Run();
 Console.WriteLine();
 
-await PooledBufferDemo.RunAsync();
+//await PooledBufferDemo.RunAsync();

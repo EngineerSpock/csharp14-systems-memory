@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <RootNamespace>Csharp14.SystemsMemory.MemoryCorruptionLab</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <NativeProjectPath>$(MSBuildThisFileDirectory)..\native\TelemetryNative.vcxproj</NativeProjectPath>
+    <NativeOutDir>$(MSBuildThisFileDirectory)..\native\bin\$(Configuration)\x64\</NativeOutDir>
+    <VsMsBuildExe>C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe</VsMsBuildExe>
+  </PropertyGroup>
+
+  <Target Name="BuildNativeProject" BeforeTargets="Build">
+    <Exec Command="&quot;$(VsMsBuildExe)&quot; &quot;$(NativeProjectPath)&quot; /t:Build &quot;/p:Configuration=$(Configuration);Platform=x64&quot; /nologo" />
+  </Target>
+
+  <Target Name="CopyNativeOutputs" AfterTargets="Build">
+    <ItemGroup>
+      <NativeArtifacts Include="$(NativeOutDir)TelemetryNative.dll" />
+      <NativeArtifacts Include="$(NativeOutDir)TelemetryNative.pdb" Condition="Exists('$(NativeOutDir)TelemetryNative.pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeArtifacts)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

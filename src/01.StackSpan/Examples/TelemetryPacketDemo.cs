@@ -1,21 +1,15 @@
 namespace Csharp14.SystemsMemory.StackSpan.Examples;
 
-internal static class TelemetryPacketDemo
+public static class TelemetryPacketDemo
 {
     private const int HeaderSize = 4;
-
     public static void Run()
     {
         const int metricId = 42;
         const int value = 1_250;
         const int timestampDeltaMs = 37;
 
-        Console.WriteLine("16-byte telemetry frame built on the stack:");
         RecordTelemetry(metricId, value, timestampDeltaMs);
-        Console.WriteLine();
-
-        Console.WriteLine("Span and Slice are views over existing memory:");
-        ShowViewSemantics();
     }
 
     private static void RecordTelemetry(int metricId, int value, int timestampDeltaMs)
@@ -44,17 +38,6 @@ internal static class TelemetryPacketDemo
         BitConverter.TryWriteBytes(timestampBytes, timestampDeltaMs);
 
         TelemetrySinkWrite(frame);
-    }
-
-    private static void ShowViewSemantics()
-    {
-        byte[] buffer = [10, 20, 30, 40];
-        Span<byte> span = buffer;
-        Span<byte> tail = span.Slice(2);
-
-        tail[0] = 99;
-
-        Console.WriteLine($"buffer[2] = {buffer[2]}");
     }
 
     private static void TelemetrySinkWrite(ReadOnlySpan<byte> frame)

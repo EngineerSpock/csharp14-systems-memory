@@ -49,7 +49,6 @@ public class TelemetryFrameBenchmarks
     private static int TelemetrySinkConsume(ReadOnlySpan<byte> frame)
     {
         var checksum = 17;
-
         foreach (var b in frame)
         {
             checksum = (checksum * 31) + b;
