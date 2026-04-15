@@ -1,5 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <NativeProjectPath>$(MSBuildThisFileDirectory)native\CompactTelemetryNative.vcxproj</NativeProjectPath>
+    <NativeOutDir>$(MSBuildThisFileDirectory)native\bin\$(Configuration)\x64\</NativeOutDir>
+    <VsMsBuildExe>C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe</VsMsBuildExe>
+  </PropertyGroup>
+
+  <Target Name="BuildNativeProject" BeforeTargets="Build">
+    <Exec Command="&quot;$(VsMsBuildExe)&quot; &quot;$(NativeProjectPath)&quot; /t:Build &quot;/p:Configuration=$(Configuration);Platform=x64&quot; /nologo" />
+  </Target>
+
+  <Target Name="CopyNativeOutputs" AfterTargets="Build">
+    <ItemGroup>
+      <NativeArtifacts Include="$(NativeOutDir)CompactTelemetryNative.dll" />
+      <NativeArtifacts Include="$(NativeOutDir)CompactTelemetryNative.pdb" Condition="Exists('$(NativeOutDir)CompactTelemetryNative.pdb')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(NativeArtifacts)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

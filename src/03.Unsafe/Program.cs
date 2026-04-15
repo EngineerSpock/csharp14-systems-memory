@@ -1,2 +1,3 @@
-Console.WriteLine("Module 03: unsafe");
-Console.WriteLine("Add runnable demos under Examples/ and invoke them from Program.cs.");
+using Csharp14.SystemsMemory.UnsafeModule.Examples;
+
+await CompactInteropCorruptionDemo.RunAsync(args);
