@@ -59,9 +59,21 @@ internal static unsafe partial class NativeMethods
 [StructLayout(LayoutKind.Sequential)]
 internal struct NativeCompletion
 {
-    public uint Status;
+    public NativeCompletionStatus Status;
     public uint SubmittedLength;
     public uint CopiedLength;
     public uint ObservedChecksum;
     public ulong FrameAddress;
+
+    public override string ToString()
+    {
+        return $"""
+Completion:
+  status           : {Status}
+  submitted length : {SubmittedLength}
+  copied length    : {CopiedLength}
+  checksum         : 0x{ObservedChecksum:X8}
+  frame address    : 0x{FrameAddress:X}
+""";
+    }
 }
