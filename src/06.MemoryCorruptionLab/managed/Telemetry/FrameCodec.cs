@@ -26,7 +26,7 @@ internal static class FrameCodec
         return frame;
     }
 
-    public static unsafe int WriteFrameFast(void* destination, nuint capacity, uint sequence, string tag)
+    public static unsafe int WriteFrameFast(void* destination, int capacity, uint sequence, string tag)
     {
         Span<TelemetrySample> samples = stackalloc TelemetrySample[SampleCount];
         FillSamples(samples, sequence);
@@ -34,7 +34,7 @@ internal static class FrameCodec
         ReadOnlySpan<byte> payload = MemoryMarshal.AsBytes(samples);
         TelemetryWireHeader header = CreateHeader(sequence, tag, payload);
 
-        nuint totalLength = (nuint)(TelemetryWireHeader.Size + payload.Length);
+        int totalLength = TelemetryWireHeader.Size + payload.Length;
         if (capacity < totalLength)
         {
             throw new ArgumentOutOfRangeException(nameof(capacity), $"Need at least {totalLength} bytes.");
@@ -43,16 +43,16 @@ internal static class FrameCodec
         ref byte destinationRef = ref Unsafe.AsRef<byte>(destination);
         Unsafe.WriteUnaligned(ref destinationRef, header);
 
-        // Payload length is expressed in bytes, so byte-based stepping is the correct model.
-        ref byte payloadRef = ref Unsafe.AddByteOffset(ref destinationRef, (nint)TelemetryWireHeader.Size);
+        // Because the base reference is byte-based, Add uses byte offsets naturally here.
+        ref byte payloadRef = ref Unsafe.Add(ref destinationRef, TelemetryWireHeader.Size);
 
-        for (nuint i = 0; i < (nuint)samples.Length; i++)
+        for (int i = 0; i < samples.Length; i++)
         {
-            nuint offset = i * (nuint)Unsafe.SizeOf<TelemetrySample>();
-            Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref payloadRef, checked((nint)offset)), samples[(int)i]);
+            int offset = i * Unsafe.SizeOf<TelemetrySample>();
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref payloadRef, offset), samples[i]);
         }
 
-        return checked((int)totalLength);
+        return totalLength;
     }
 
     public static void DescribeManagedFrame(ReadOnlySpan<byte> frame)

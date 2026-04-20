@@ -8,7 +8,8 @@ namespace Csharp14.SystemsMemory.UnsafeModule.Telemetry;
 internal static class FrameCodec
 {
     public const int SampleCount = 3;
-    public static readonly int RecommendedBufferSize = TelemetryWireHeader.Size + (SampleCount * Unsafe.SizeOf<TelemetrySample>());
+    public static readonly int RecommendedBufferSize = 
+        TelemetryWireHeader.Size + (SampleCount * Unsafe.SizeOf<TelemetrySample>());
 
     public static byte[] BuildManagedFrame(uint sequence, string tag)
     {
@@ -18,7 +19,9 @@ internal static class FrameCodec
         ReadOnlySpan<byte> payload = MemoryMarshal.AsBytes(samples);
         TelemetryWireHeader header = CreateHeader(sequence, tag, payload);
 
-        byte[] frame = GC.AllocateUninitializedArray<byte>(TelemetryWireHeader.Size + payload.Length);
+        byte[] frame = GC.AllocateUninitializedArray<byte>(
+            TelemetryWireHeader.Size + payload.Length
+        );
         Span<byte> destination = frame;
         WriteStruct(destination, header);
         payload.CopyTo(destination[TelemetryWireHeader.Size..]);
@@ -26,14 +29,15 @@ internal static class FrameCodec
         return frame;
     }
 
-    public static unsafe int WriteFrameFast(void* destination, nuint capacity, uint sequence, string tag)
+    public static unsafe int WriteFrameFast(void* destination, int capacity, uint sequence, string tag)
     {
         Span<TelemetrySample> samples = stackalloc TelemetrySample[SampleCount];
         FillSamples(samples, sequence);
 
         ReadOnlySpan<byte> payload = MemoryMarshal.AsBytes(samples);
         TelemetryWireHeader header = CreateHeader(sequence, tag, payload);
-        nuint totalLength = (nuint)(TelemetryWireHeader.Size + payload.Length);
+        
+        int totalLength = TelemetryWireHeader.Size + payload.Length;
 
         if (capacity < totalLength)
         {
@@ -43,14 +47,14 @@ internal static class FrameCodec
         ref byte destinationRef = ref Unsafe.AsRef<byte>(destination);
         Unsafe.WriteUnaligned(ref destinationRef, header);
 
-        ref byte payloadRef = ref Unsafe.AddByteOffset(ref destinationRef, (nint)TelemetryWireHeader.Size);
-        for (nuint i = 0; i < (nuint)samples.Length; i++)
+        ref byte payloadRef = ref Unsafe.Add(ref destinationRef, TelemetryWireHeader.Size);
+        for (int i = 0; i < samples.Length; i++)
         {
-            nuint offset = i * (nuint)Unsafe.SizeOf<TelemetrySample>();
-            Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref payloadRef, checked((nint)offset)), samples[(int)i]);
+            int offset = i * Unsafe.SizeOf<TelemetrySample>();
+            Unsafe.WriteUnaligned(ref Unsafe.Add(ref payloadRef, offset), samples[i]);
         }
 
-        return checked((int)totalLength);
+        return totalLength;
     }
 
     public static void DescribeFrame(ReadOnlySpan<byte> frame)

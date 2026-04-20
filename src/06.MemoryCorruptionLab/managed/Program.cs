@@ -51,7 +51,7 @@ static async Task RunBugBAsync(TelemetrySession session, DemoOptions options)
     unsafe
     {
         nint framePointer = session.GetBufferPointer(buffer);
-        int written = FrameCodec.WriteFrameFast((void*)framePointer, (nuint)session.GetBufferCapacity(buffer), options.Sequence, options.Tag);
+        int written = FrameCodec.WriteFrameFast((void*)framePointer, session.GetBufferCapacity(buffer), options.Sequence, options.Tag);
         session.DescribeNativeInspection((void*)framePointer, written);
 
         completionTask = session.SubmitZeroCopyAsync((void*)framePointer, written, options.Token);
@@ -75,7 +75,7 @@ static async Task RunFixedZeroCopyAsync(TelemetrySession session, DemoOptions op
     unsafe
     {
         nint framePointer = session.GetBufferPointer(buffer);
-        int written = FrameCodec.WriteFrameFast((void*)framePointer, (nuint)session.GetBufferCapacity(buffer), options.Sequence, options.Tag);
+        int written = FrameCodec.WriteFrameFast((void*)framePointer, session.GetBufferCapacity(buffer), options.Sequence, options.Tag);
         session.DescribeNativeInspection((void*)framePointer, written);
 
         completionTask = session.SubmitZeroCopyAsync((void*)framePointer, written, options.Token, buffer);

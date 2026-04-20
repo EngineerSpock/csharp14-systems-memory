@@ -15,18 +15,18 @@ internal static class CompactInteropCorruptionDemo
 
         PrintHeader(mode);
 
-        using TelemetrySession session = new(mode == DemoMode.BugA ? NativeDemoMode.LayoutOverflow : NativeDemoMode.Healthy);
+        using TelemetrySession session = new(mode == DemoMode.CopyAlternateLayout ? NativeDemoMode.AlternateLayout : NativeDemoMode.DefaultLayout);
 
         switch (mode)
         {
-            case DemoMode.Healthy:
-            case DemoMode.BugA:
+            case DemoMode.Copy:
+            case DemoMode.CopyAlternateLayout:
                 await RunCopyPathAsync(session);
                 break;
-            case DemoMode.BugB:
+            case DemoMode.ZeroCopyCallerOwned:
                 await RunZeroCopyPathAsync(session, retainOwner: false);
                 break;
-            case DemoMode.Fixed:
+            case DemoMode.ZeroCopySessionOwned:
                 await RunZeroCopyPathAsync(session, retainOwner: true);
                 break;
         }
@@ -50,7 +50,7 @@ internal static class CompactInteropCorruptionDemo
 
         unsafe
         {
-            int written = FrameCodec.WriteFrameFast((void*)buffer.Pointer, (nuint)buffer.Capacity, DemoSequence, DemoTag);
+            int written = FrameCodec.WriteFrameFast((void*)buffer.Pointer, buffer.Capacity, DemoSequence, DemoTag);
             FrameCodec.DescribeFrame(buffer.AsReadOnlySpan(written));
             completionTask = session.SubmitZeroCopyAsync(buffer, written, retainOwner);
         }

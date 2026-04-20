@@ -2,8 +2,8 @@ namespace Csharp14.SystemsMemory.UnsafeModule.Examples;
 
 internal enum DemoMode
 {
-    Healthy,
-    BugA,
-    BugB,
-    Fixed
+    Copy,
+    CopyAlternateLayout,
+    ZeroCopyCallerOwned,
+    ZeroCopySessionOwned
 }
