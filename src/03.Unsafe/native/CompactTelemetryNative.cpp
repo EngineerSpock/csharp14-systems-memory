@@ -8,8 +8,6 @@
 
 namespace
 {
-    constexpr uint32_t CT_DEMO_LAYOUT_OVERFLOW = 1;
-
     constexpr uint32_t CT_STATUS_OK = 0;
     constexpr uint32_t CT_STATUS_BAD_ARGUMENT = 1;
     constexpr uint32_t CT_STATUS_BAD_HEADER = 2;
@@ -37,27 +35,12 @@ namespace
     };
 #pragma pack(pop)
 
-    struct ct_buggy_header_layout
-    {
-        uint32_t magic;
-        uint16_t header_size;
-        uint16_t opcode;
-        uint32_t payload_length;
-        uint32_t sequence;
-        uint16_t flags;
-        uint16_t reserved;
-        uint64_t correlation_id;
-        uint8_t tag[8];
-        uint32_t payload_checksum;
-    };
-
     struct ct_trailer
     {
         uint64_t cookie;
     };
 
     static_assert(sizeof(ct_wire_header) == 40, "Packed wire header must stay at 40 bytes.");
-    static_assert(sizeof(ct_buggy_header_layout) == 48, "Buggy header must stay different from the wire header.");
 }
 
 struct ct_buffer
@@ -88,7 +71,6 @@ struct ct_session
     ct_pending_frame* tail;
     ct_completion_callback callback;
     void* callback_context;
-    uint32_t demo_mode;
 };
 
 namespace
@@ -257,7 +239,7 @@ namespace
     }
 }
 
-CT_API int32_t CT_CALL ct_session_open(uint32_t demo_mode, ct_session** out_session)
+CT_API int32_t CT_CALL ct_session_open(ct_session** out_session)
 {
     if (out_session == nullptr)
     {
@@ -270,7 +252,6 @@ CT_API int32_t CT_CALL ct_session_open(uint32_t demo_mode, ct_session** out_sess
         return CT_STATUS_INTERNAL_ERROR;
     }
 
-    session->demo_mode = demo_mode;
     InitializeCriticalSection(&session->lock);
     session->work_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     session->drained_event = CreateEventW(nullptr, TRUE, TRUE, nullptr);
@@ -358,19 +339,8 @@ CT_API int32_t CT_CALL ct_session_submit_copy(ct_session* session, const void* f
     pending->trailer = reinterpret_cast<ct_trailer*>(pending->frame + frame_length);
     pending->trailer->cookie = CT_TRAILER_COOKIE;
 
-    uint32_t copy_length = frame_length;
-    if (session->demo_mode == CT_DEMO_LAYOUT_OVERFLOW)
-    {
-        const auto* header = static_cast<const ct_buggy_header_layout*>(frame);
-        copy_length = static_cast<uint32_t>(sizeof(ct_buggy_header_layout) + header->payload_length);
-        if (copy_length > frame_length + sizeof(ct_trailer))
-        {
-            copy_length = frame_length + sizeof(ct_trailer);
-        }
-    }
-
-    pending->copied_length = copy_length;
-    memcpy(pending->frame, frame, copy_length);
+    pending->copied_length = frame_length;
+    memcpy(pending->frame, frame, frame_length);
     ct_enqueue(session, pending);
     return CT_STATUS_OK;
 }

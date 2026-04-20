@@ -24,9 +24,7 @@ internal readonly record struct DemoOptions(DemoMode Mode)
         value.ToLowerInvariant() switch
         {
             "copy" => DemoMode.Copy,
-            "copy-alt-layout" => DemoMode.CopyAlternateLayout,
-            "zero-copy-caller-owned" => DemoMode.ZeroCopyCallerOwned,
-            "zero-copy-session-owned" => DemoMode.ZeroCopySessionOwned,
+            "fast" => DemoMode.Fast,
             _ => throw new ArgumentException($"Unknown mode '{value}'.")
         };
 }

@@ -15,19 +15,15 @@ internal static class CompactInteropCorruptionDemo
 
         PrintHeader(mode);
 
-        using TelemetrySession session = new(mode == DemoMode.CopyAlternateLayout ? NativeDemoMode.AlternateLayout : NativeDemoMode.DefaultLayout);
+        using TelemetrySession session = new();
 
         switch (mode)
         {
             case DemoMode.Copy:
-            case DemoMode.CopyAlternateLayout:
                 await RunCopyPathAsync(session);
                 break;
-            case DemoMode.ZeroCopyCallerOwned:
-                await RunZeroCopyPathAsync(session, retainOwner: false);
-                break;
-            case DemoMode.ZeroCopySessionOwned:
-                await RunZeroCopyPathAsync(session, retainOwner: true);
+            case DemoMode.Fast:
+                await RunFastPathAsync(session);
                 break;
         }
     }
@@ -43,24 +39,9 @@ internal static class CompactInteropCorruptionDemo
         session.Flush();
     }
 
-    private static async Task RunZeroCopyPathAsync(TelemetrySession session, bool retainOwner)
+    private static async Task RunFastPathAsync(TelemetrySession session)
     {
-        using NativeBuffer buffer = session.AllocateBuffer(FrameCodec.RecommendedBufferSize);
-        Task<NativeCompletion> completionTask;
-
-        unsafe
-        {
-            int written = FrameCodec.WriteFrameFast((void*)buffer.Pointer, buffer.Capacity, DemoSequence, DemoTag);
-            FrameCodec.DescribeFrame(buffer.AsReadOnlySpan(written));
-            completionTask = session.SubmitZeroCopyAsync(buffer, written, retainOwner);
-        }
-
-        if (!retainOwner)
-        {
-            buffer.Dispose();
-        }
-
-        NativeCompletion completion = await completionTask;
+        NativeCompletion completion = await session.SubmitFastAsync(DemoSequence, DemoTag);
         Console.WriteLine();
         Console.WriteLine(completion);
         session.Flush();

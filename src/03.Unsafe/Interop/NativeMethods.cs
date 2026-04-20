@@ -9,7 +9,7 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName, EntryPoint = "ct_session_open")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-    internal static partial int SessionOpen(uint demoMode, out nint session);
+    internal static partial int SessionOpen(out nint session);
 
     [LibraryImport(LibraryName, EntryPoint = "ct_session_close")]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

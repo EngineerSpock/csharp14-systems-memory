@@ -24,7 +24,7 @@ struct ct_completion
 
 typedef void (CT_CALL* ct_completion_callback)(void* context, const ct_completion* completion);
 
-CT_API int32_t CT_CALL ct_session_open(uint32_t demo_mode, ct_session** out_session);
+CT_API int32_t CT_CALL ct_session_open(ct_session** out_session);
 CT_API void CT_CALL ct_session_close(ct_session* session);
 CT_API int32_t CT_CALL ct_session_register_callback(ct_session* session, ct_completion_callback callback, void* context);
 CT_API int32_t CT_CALL ct_session_submit_copy(ct_session* session, const void* frame, uint32_t frame_length);

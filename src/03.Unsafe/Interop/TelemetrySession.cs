@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Csharp14.SystemsMemory.UnsafeModule.Telemetry;
 
 namespace Csharp14.SystemsMemory.UnsafeModule.Interop;
 
@@ -8,11 +9,10 @@ internal sealed class TelemetrySession : IDisposable
     private readonly SessionHandle _handle;
     private readonly GCHandle _selfHandle;
     private TaskCompletionSource<NativeCompletion>? _pendingCompletion;
-    private NativeBuffer? _retainedBuffer;
 
-    public TelemetrySession(NativeDemoMode mode)
+    public TelemetrySession()
     {
-        NativeMethods.ThrowOnError(NativeMethods.SessionOpen((uint)mode, out nint session), "ct_session_open");
+        NativeMethods.ThrowOnError(NativeMethods.SessionOpen(out nint session), "ct_session_open");
         _handle = new SessionHandle(session);
         _selfHandle = GCHandle.Alloc(this);
 
@@ -26,8 +26,6 @@ internal sealed class TelemetrySession : IDisposable
 
     public void Dispose()
     {
-        _retainedBuffer?.Dispose();
-
         if (_selfHandle.IsAllocated)
         {
             _selfHandle.Free();
@@ -53,20 +51,25 @@ internal sealed class TelemetrySession : IDisposable
         return tcs.Task;
     }
 
-    public unsafe Task<NativeCompletion> SubmitZeroCopyAsync(NativeBuffer buffer, int frameLength, bool retainOwner)
+    public unsafe Task<NativeCompletion> SubmitFastAsync(uint sequence, string tag)
     {
         TaskCompletionSource<NativeCompletion> tcs = ArmSinglePendingOperation();
+        OutboundFrameLease lease = OutboundFrameLease.Create(this, sequence, tag);
 
-        if (retainOwner)
+        try
         {
-            _retainedBuffer = buffer;
+            FrameCodec.DescribeFrame(lease.GetFrameSpan());
+
+            NativeMethods.ThrowOnError(
+                NativeMethods.SessionSubmitZeroCopy(_handle.DangerousGetHandle(), (void*)lease.AllocationPointer, (uint)lease.FrameLength),
+                "ct_session_submit_zero_copy");
+
+            return tcs.Task;
         }
-
-        NativeMethods.ThrowOnError(
-            NativeMethods.SessionSubmitZeroCopy(_handle.DangerousGetHandle(), (void*)buffer.Pointer, (uint)frameLength),
-            "ct_session_submit_zero_copy");
-
-        return tcs.Task;
+        finally
+        {
+            lease.Dispose();
+        }
     }
 
     public NativeBuffer AllocateBuffer(int capacity)
@@ -93,9 +96,6 @@ internal sealed class TelemetrySession : IDisposable
 
     private void Complete(NativeCompletion completion)
     {
-        _retainedBuffer?.Dispose();
-        _retainedBuffer = null;
-
         TaskCompletionSource<NativeCompletion>? pending = _pendingCompletion;
         _pendingCompletion = null;
         pending?.TrySetResult(completion);
