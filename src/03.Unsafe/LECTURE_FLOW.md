@@ -1,180 +1,117 @@
 # Module 03 Lecture Flow
 
-Этот compact demo надо рассказывать не как "смотрите, сколько тут unsafe", а как историю про быстрый interop-path, в котором нарушение контракта проявляется позже и не там, где был сделан неправильный шаг.
+This branch has one terminal scenario: unmanaged heap corruption caused by managed unsafe pointer arithmetic.
 
-## Короткий сюжет
+The native side is infrastructure, not the source of the bug. It allocates a Windows heap block, exposes a frame pointer and capacity, and releases the block. The corrupting write remains in managed code.
 
-У нас есть managed-приложение, которое формирует telemetry frame и отдаёт его native worker-у.
+## Story
 
-Почему часть системы native:
+Managed code asks native for a heap buffer large enough to hold one telemetry frame.
 
-- нужен точный wire layout,
-- есть асинхронный worker thread,
-- есть работа с unmanaged memory,
-- нужен copy path и более быстрый zero-copy path,
-- есть явный контракт на границе managed/native.
+Managed code then writes a valid frame into that buffer:
 
-Главная мысль на старте:
+- packed 40-byte header,
+- 48-byte payload,
+- 88 bytes total.
 
-- managed-код отвечает за orchestration и формирование кадра,
-- native-код выступает как внешний packet processor с понятным контрактом,
-- ошибка возникает не потому, что "unsafe сам по себе опасен", а потому что на межъязыковой границе легко сломать адрес, длину или lifetime.
+After the frame is built, managed code performs one more ordinary-looking step: `CommitTransportMetadata()`. That step writes a small footer-like metadata record next to the frame.
 
-## Что Показывать В Первом Проходе
+The bug is that the buffer was allocated for the frame only. No metadata area was reserved after it.
 
-Показывать только эти файлы:
+So the frame is valid, but the later metadata write crosses the heap allocation boundary. With full page heap enabled, WinDbg should stop close to that invalid write. Without page heap, the process may survive the write and fail when the corrupted heap block is released.
 
-1. [Program.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Program.cs)
-2. [CompactInteropCorruptionDemo.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Examples/CompactInteropCorruptionDemo.cs)
-3. [TelemetrySession.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Interop/TelemetrySession.cs)
+## Files To Show
+
+1. [TelemetryWireHeader.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Telemetry/TelemetryWireHeader.cs)
+2. [TelemetrySample.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Telemetry/TelemetrySample.cs)
+3. [FrameCodec.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Telemetry/FrameCodec.cs)
 4. [NativeMethods.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Interop/NativeMethods.cs)
+5. [HeapBuffer.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Interop/HeapBuffer.cs)
+6. [TelemetryFrameTransport.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Interop/TelemetryFrameTransport.cs)
+7. [DemoRunner.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/DemoRunner.cs)
 
-Этого достаточно, чтобы студент понял систему на уровне контракта, не зная деталей C++ реализации.
+You do not need to open the native implementation during the first pass. Treat it as the heap service: allocate, expose pointer/capacity, release.
 
-## Что Не Показывать Сразу
-
-Не надо на первом проходе разбирать:
-
-- весь native-код,
-- детали `.csproj` и `vcxproj`,
-- каждую P/Invoke сигнатуру по отдельности,
-- внутренности worker loop,
-- cleanup-путь до того, как по сюжету станет понятно, что проблема связана с lifetime.
-
-Фраза для лекции:
-
-"Сейчас нам важны только байты, адрес, длина и время жизни памяти. Всё остальное пока фон."
-
-## Порядок Подачи
-
-### 1. Начать С `Program.cs`
-
-Что показать:
-
-- есть два режима: `copy` и `fast`,
-- сценарий очень короткий:
-  - собрали frame,
-  - отправили его в native,
-  - получили completion позже.
-
-Что проговорить:
-
-- это небольшой, но production-adjacent interop-сценарий,
-- copy path нужен как baseline,
-- fast path нужен как "оптимизированный" путь, где контракт становится жёстче.
-
-### 2. Перейти К `CompactInteropCorruptionDemo.cs`
-
-Что показать:
-
-- `copy` использует обычный managed frame,
-- `fast` идёт через отдельный session API,
-- в обоих случаях снаружи код выглядит невинно: мы не видим никаких "опасных" явных действий вроде ручного free сразу после submit.
-
-Ключевая формулировка:
-
-"Снаружи fast path выглядит как нормальная оптимизация. Это важно: источник бага не должен бросаться в глаза в demo runner-е."
-
-### 3. Показать `FrameCodec`
-
-Можно открыть [FrameCodec.cs](c:/git/csharp14-systems-memory/src/03.Unsafe/Telemetry/FrameCodec.cs) и быстро пройтись только по этим вещам:
-
-- packed `TelemetryWireHeader`,
-- `fixed byte Tag[8]`,
-- `stackalloc` для `TelemetrySample`,
-- `MemoryMarshal.AsBytes`,
-- `Unsafe.WriteUnaligned`,
-- byte-based stepping.
-
-Что проговорить:
-
-- до interop-границы кадр формируется корректно,
-- managed side умеет показать валидный header и checksum ещё до submit,
-- это важно для дальнейшего расследования: frame выглядел правильным до передачи в native.
-
-### 4. Перейти К `TelemetrySession`
-
-Здесь ключевое место сюжета.
-
-Что показать:
-
-- `LibraryImport`,
-- callback через `delegate* unmanaged`,
-- `TaskCompletionSource` как managed completion bridge,
-- `SubmitCopyAsync`,
-- `SubmitFastAsync`.
-
-Что проговорить:
-
-- `copy` и `fast` отличаются не синтаксисом, а контрактом,
-- на interop-границе всегда надо ответить на четыре вопроса:
-  - какие байты,
-  - по какому адресу,
-  - кто владелец памяти,
-  - сколько этот адрес обязан жить.
-
-## Как Показывать Baseline
-
-Запуск:
+## First Run
 
 ```powershell
-dotnet run --project src\03.Unsafe -- copy
+dotnet run --project src\03.Unsafe
 ```
 
-Что сказать:
+Expected shape:
 
-- frame собирается корректно,
-- completion приходит со статусом `Ok`,
-- это baseline, от которого потом удобно отклоняться.
+- the frame prints as valid,
+- frame length is 88,
+- allocation size is 88,
+- metadata commit returns,
+- the process may then terminate with heap corruption when the buffer is released.
 
-Главная цель baseline:
+The important observation is the size mismatch in the contract:
 
-- показать, что сам native processor не "рандомно сломан",
-- зафиксировать, как выглядит нормальный кадр и нормальный completion.
+```text
+frame length    : 88
+allocation size : 88
+```
 
-## Как Показывать Broken Fast Path
+There is no room after the frame.
 
-Запуск:
+## Investigation
+
+Go to `TelemetryFrameTransport.CommitTransportMetadata()`.
+
+The method writes two normal-looking fields:
+
+- metadata magic,
+- frame length.
+
+Then inspect `GetTransportMetadataSpan()`.
+
+The metadata offset is computed from the aligned frame length:
+
+```csharp
+int metadataOffset = AlignUp(FrameLength, TransportMetadataSize);
+```
+
+For this frame, `FrameLength` is 88, and 88 is already aligned to 8. So the metadata span begins at byte 88.
+
+But the allocation is exactly 88 bytes long. Valid frame bytes are `[0..87]`. Byte 88 is already outside the allocated frame buffer.
+
+That is the managed-side bug: the code derives a second write location that the allocation contract never gave it.
+
+## WinDbg Run
+
+Build first:
 
 ```powershell
-dotnet run --project src\03.Unsafe -- fast
+dotnet build src\03.Unsafe
 ```
 
-Что видеть без page heap:
+Enable full page heap for the apphost exe:
 
-- managed-side описание frame выглядит валидно,
-- completion приходит как `BadHeader`.
+```powershell
+gflags /p /enable Csharp14.SystemsMemory.Unsafe.exe /full
+```
 
-Что говорить:
+Run under WinDbg:
 
-- symptom появляется позже, на worker thread,
-- это не доказывает, что worker и есть источник проблемы,
-- на старте мы знаем только одно: до native boundary frame выглядел корректно.
+```powershell
+windbg src\03.Unsafe\bin\Debug\net10.0\Csharp14.SystemsMemory.Unsafe.exe
+```
 
-## Как Подводить К Clip 4 / WinDbg
+With full page heap, the invalid metadata write should be caught close to the write site instead of being discovered later during heap release.
 
-Для расследования тот же `fast` режим запускается не через `dotnet run`, а через apphost exe под WinDbg:
+After the demo, disable page heap:
 
-[Csharp14.SystemsMemory.Unsafe.exe](c:/git/csharp14-systems-memory/src/03.Unsafe/bin/Debug/net10.0/Csharp14.SystemsMemory.Unsafe.exe)
+```powershell
+gflags /p /disable Csharp14.SystemsMemory.Unsafe.exe
+```
 
-Если для этого exe включить full page heap, тот же самый lifetime bug обычно манифестируется уже не как `BadHeader`, а как `AccessViolation`.
+## Fix Direction
 
-Именно это даёт правильную драматургию:
+The fix is to make the memory contract honest:
 
-1. В обычном запуске fast path выглядит как delayed corruption.
-2. Под диагностикой тот же кейс становится AV.
-3. После фикса lifetime ошибка не исчезает полностью: остаётся второй contract bug, который уже проявляется как `BadHeader`.
+- reserve metadata space in the native allocation,
+- or store metadata inside the frame format,
+- or reject `CommitTransportMetadata()` when there is no capacity after the frame.
 
-## Что Должен Унести Студент После Первой Части
-
-До отдельной лекции про WinDbg студент должен уже понимать:
-
-- где формируются байты,
-- где проходит managed/native boundary,
-- почему fast path требует более строгого контракта, чем copy path,
-- почему symptom site и root cause часто не совпадают,
-- почему расследование memory corruption надо начинать не с угадывания, а с фиксации адреса, длины и lifetime.
-
-## Одной Фразой Вся История
-
-"Мы сделали быстрый zero-copy interop path, который выглядел как нормальная оптимизация, но на границе managed/native незаметно нарушили контракт на адрес и lifetime — и из-за этого получили delayed corruption, которую приходится расследовать уже через WinDbg."
+Do not "fix" the symptom by changing the heap release path. The bad write is the bug.

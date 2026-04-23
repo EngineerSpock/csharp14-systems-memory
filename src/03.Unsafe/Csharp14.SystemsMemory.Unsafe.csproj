@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <NativeProjectPath>$(MSBuildThisFileDirectory)native\CompactTelemetryNative.vcxproj</NativeProjectPath>
+    <NativeProjectPath>$(MSBuildThisFileDirectory)native\HeapBufferNative.vcxproj</NativeProjectPath>
     <NativeOutDir>$(MSBuildThisFileDirectory)native\bin\$(Configuration)\x64\</NativeOutDir>
     <VsMsBuildExe>C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe</VsMsBuildExe>
   </PropertyGroup>
@@ -18,8 +18,8 @@
 
   <Target Name="CopyNativeOutputs" AfterTargets="Build">
     <ItemGroup>
-      <NativeArtifacts Include="$(NativeOutDir)CompactTelemetryNative.dll" />
-      <NativeArtifacts Include="$(NativeOutDir)CompactTelemetryNative.pdb" Condition="Exists('$(NativeOutDir)CompactTelemetryNative.pdb')" />
+      <NativeArtifacts Include="$(NativeOutDir)HeapBufferNative.dll" />
+      <NativeArtifacts Include="$(NativeOutDir)HeapBufferNative.pdb" Condition="Exists('$(NativeOutDir)HeapBufferNative.pdb')" />
     </ItemGroup>
     <Copy SourceFiles="@(NativeArtifacts)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
   </Target>

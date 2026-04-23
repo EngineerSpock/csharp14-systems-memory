@@ -1,3 +1,3 @@
-using Csharp14.SystemsMemory.UnsafeModule.Examples;
+using Csharp14.SystemsMemory.UnsafeModule;
 
-await CompactInteropCorruptionDemo.RunAsync(args);
+DemoRunner.Run(args);
