@@ -11,10 +11,10 @@ internal static class DemoRunner
     public static void Run(string[] args)
     {
         PrintHeader();
-        RunHeapScenario();
+        RunHeapDemo();
     }
 
-    private static void RunHeapScenario()
+    private static void RunHeapDemo()
     {
         using TelemetryFrameTransport transport = TelemetryFrameTransport.Create(DemoSequence, DemoTag);
 
